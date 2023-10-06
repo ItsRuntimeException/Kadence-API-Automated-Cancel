@@ -70,16 +70,18 @@ def getTodayUserBookings(header,userId):
 
 def performCancellation(header):
     userList = getUsers(header)
+    # This for-loop should only be used if performing org-wide employee booking cancellations
     #for userId in userList:
         #bookingIds = getSpecificUserBookings(header, userId)
-    bookingIds = getTodayUserBookings(header, '01H7ZZGPC49PXWXNNAP7Y5KRPZ')
+    userId
+    bookingIds = getTodayUserBookings(header, userId)
     for bookingId in bookingIds['hydra:member']:
         nowTime = parse((datetime.now().strftime('%Y-%m-%dT%H:%M:%S') + '+00:00'))
         startTime = parse(bookingId['startDate'])
         delta = relativedelta(nowTime, startTime)
         print(nowTime, startTime, delta)
         if bookingId['status'] == 'Booked' and (delta.hours > 0 or delta.minutes > 30):
-            cancelBooking(header, '01H7ZZGPC49PXWXNNAP7Y5KRPZ', bookingId)
+            cancelBooking(header, userId, bookingId)
     print('Updated booking!')
 
 def cancelBooking(header, userId, bookingId):
