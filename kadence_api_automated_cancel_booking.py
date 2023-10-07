@@ -1,9 +1,8 @@
 import sys
 import json
 import requests
-import schedule
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 
@@ -27,7 +26,7 @@ def authenticate(url, client_id, client_secret):
         sys.exit(1)
     print("Successfully obtained a new token")
     tokens = json.loads(token.text)
-    print(tokens['access_token'])
+    #print(tokens['access_token'])
     return tokens['access_token']
 
 def toFile(filename, json_data):
@@ -39,17 +38,18 @@ def toFile(filename, json_data):
 def getUsers(header):
     url = 'https://api.onkadence.co/v1/public/users'
     response = requests.get(url, params={'itemsPerPage':500}, headers=header)
-    toFile('Users', response.json())
     userSimplified = []
     userList = []
     for item in response.json()['hydra:member']:
         userSimplified.append(
             {
                 'userId': item['id'],
+                'email': item['email'],
                 'firstName': item['firstName'],
                 'lastName': item['lastName']
             })
         userList.append(item['id'])
+    #toFile('Users', response.json())
     toFile('Users_simplified', {'hydra:member': userSimplified})
     return userList
 
@@ -61,35 +61,36 @@ def logBookings(header):
 
 def getTodayUserBookings(header,userId):
     url = 'https://api.onkadence.co/v1/public/users/{}/bookings'.format(userId)
-    startTime = datetime.today().strftime('%Y-%m-%dT') + '09:00:00' + '+00:00' # 9:00 AM + TimezoneDiff
-    endTime = datetime.today().strftime('%Y-%m-%dT') + '17:00:00' + '+00:00' # 5:00 PM + TimezoneDiff
-    print(startTime, endTime)
+    # GET DATE RANGE OF 1 DAY:
+    startTime = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    endTime = datetime.now() + timedelta(days=1)
+    endTime = endTime.astimezone().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    print('Gathering time range between: {} - {}'.format(startTime, endTime))
     response = requests.get(url, headers=header, params={ 'startDateTime[after]': startTime, 'endDateTime[before]': endTime})
-    toFile('RonaldLin', response.json())
+    toFile('myBookings', response.json())
     return response.json()
-
-def performCancellation(header):
-    userList = getUsers(header)
-    # This for-loop should only be used if performing org-wide employee booking cancellations
-    #for userId in userList:
-        #bookingIds = getSpecificUserBookings(header, userId)
-    userId
-    bookingIds = getTodayUserBookings(header, userId)
-    for bookingId in bookingIds['hydra:member']:
-        nowTime = parse((datetime.now().strftime('%Y-%m-%dT%H:%M:%S') + '+00:00'))
-        startTime = parse(bookingId['startDate'])
-        delta = relativedelta(nowTime, startTime)
-        print(nowTime, startTime, delta)
-        if bookingId['status'] == 'Booked' and (delta.hours > 0 or delta.minutes > 30):
-            cancelBooking(header, userId, bookingId)
-    print('Updated booking!')
 
 def cancelBooking(header, userId, bookingId):
         url = 'https://api.onkadence.co/v1/public/bookings/{}/cancel'.format(bookingId['id'])
         header['Accept'] = 'application/ld+json'
         response = requests.post(url, headers=header, json={ 'userId': userId })
-        #toFile('cancel', response.json())
         print(json.dumps(response.json(),indent=4))
+
+def performCancellation(header):
+    userList = getUsers(header)
+    #for userId in userList:
+        #bookingIds = getSpecificUserBookings(header, userId)
+    userId='<INPUT_USERID_HERE>'
+    bookingIds = getTodayUserBookings(header, userId)
+    print('\nAudit:')
+    for bookingId in bookingIds['hydra:member']:
+        nowTime = parse(datetime.now().astimezone().replace(microsecond=0).isoformat())
+        startTime = parse(bookingId['startDate'])
+        delta = relativedelta(nowTime, startTime)
+        print(nowTime, startTime, delta)
+        if (delta.hours > 0 or delta.minutes > 30) and bookingId['status'] == 'booked':
+            cancelBooking(header, userId, bookingId)
+            print('Cancelled unchecked-in booking!')
 
 def main():
     # INITIALIZATION
@@ -99,9 +100,9 @@ def main():
     header = {'Authorization': 'Bearer {}'.format(myToken)}
     # TASK PERFORM
     while True:
-        print('Updating booking every 30 seconds...')
+        print('Updating booking every 5 minutes...')
         performCancellation(header)
-        time.sleep(30) # check every 30 seconds
+        time.sleep(300) # check every 30 seconds
 
 if __name__ == '__main__':
     main()
