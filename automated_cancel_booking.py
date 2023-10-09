@@ -70,8 +70,8 @@ def getTodayUserBookings(header,userId):
     toFile('myBookings', response.json())
     return response.json()
 
-def cancelBooking(header, userId, bookingId):
-        url = 'https://api.onkadence.co/v1/public/bookings/{}/cancel'.format(bookingId['id'])
+def cancelBooking(header, userId, bookingBlock):
+        url = 'https://api.onkadence.co/v1/public/bookings/{}/cancel'.format(bookingBlock['id'])
         header['Accept'] = 'application/ld+json'
         response = requests.post(url, headers=header, json={ 'userId': userId })
         print(json.dumps(response.json(),indent=4))
@@ -83,13 +83,13 @@ def performCancellation(header):
     userId='<INPUT_USERID_HERE>'
     bookingIds = getTodayUserBookings(header, userId)
     print('\nAudit:')
-    for bookingId in bookingIds['hydra:member']:
+    for bookingBlock in bookingIds['hydra:member']:
         nowTime = parse(datetime.now().astimezone().replace(microsecond=0).isoformat())
-        startTime = parse(bookingId['startDate'])
+        startTime = parse(bookingBlock['startDate'])
         delta = relativedelta(nowTime, startTime)
         print(nowTime, startTime, delta)
-        if (delta.hours > 0 or delta.minutes > 30) and bookingId['status'] == 'booked':
-            cancelBooking(header, userId, bookingId)
+        if (delta.hours > 0 or delta.minutes > 30) and bookingBlock['status'] == 'booked':
+            cancelBooking(header, userId, bookingBlock)
             print('Cancelled unchecked-in booking!')
 
 def main():
